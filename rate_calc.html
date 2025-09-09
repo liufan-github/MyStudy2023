@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>汇率转换分析工具</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    input, button {
+      margin: 5px;
+      padding: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    h2 {
+      margin-top: 40px;
+    }
+    .summary {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>汇率转换分析工具</h1>
+
+  <!-- 美元 → 日元 -->
+  <h2>美元 → 日元</h2>
+  <table id="usdToJpyTable">
+    <tr><th>美元金额</th><th>美元兑日元汇率</th><th>兑换后日元</th><th>操作</th></tr>
+  </table>
+  <button onclick="addRow('usdToJpyTable', ['usdAmount', 'usdToJpyRate'], 'usdToJpyResult', 'usdToJpy')">➕ 添加交易行</button>
+
+  <!-- 日元 → 美元 -->
+  <h2>日元 → 美元</h2>
+  <table id="jpyToUsdTable">
+    <tr><th>日元金额</th><th>日元兑美元汇率</th><th>兑换后美元</th><th>操作</th></tr>
+  </table>
+  <button onclick="addRow('jpyToUsdTable', ['jpyAmount', 'jpyToUsdRate'], 'jpyToUsdResult', 'jpyToUsd')">➕ 添加交易行</button>
+
+  <br><button onclick="calculateSummary()">📊 计算汇总</button>
+
+  <div class="summary" id="summaryResult"></div>
+
+  <script>
+    function formatNumber(num) {
+      return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    }
+
+    function addRow(tableId, inputClasses, resultClass, type) {
+      const table = document.getElementById(tableId);
+      const row = table.insertRow();
+      inputClasses.forEach(cls => {
+        const cell = row.insertCell();
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = cls;
+        input.setAttribute('oninput', `autoCalc(this, '${type}')`);
+        cell.appendChild(input);
+      });
+      const resultCell = row.insertCell();
+      resultCell.className = resultClass;
+      resultCell.textContent = '--';
+      const actionCell = row.insertCell();
+      actionCell.innerHTML = `<button onclick="removeRow(this)">删除</button>`;
+    }
+
+    function removeRow(btn) {
+      const row = btn.parentNode.parentNode;
+      row.parentNode.removeChild(row);
+    }
+
+    function autoCalc(input, type) {
+      const row = input.closest('tr');
+      let amount, rate, result;
+      if (type === 'usdToJpy') {
+        amount = parseFloat(row.querySelector('.usdAmount')?.value);
+        rate = parseFloat(row.querySelector('.usdToJpyRate')?.value);
+        result = amount * rate;
+        if (!isNaN(result)) {
+          row.querySelector('.usdToJpyResult').textContent = formatNumber(result);
+        } else {
+          row.querySelector('.usdToJpyResult').textContent = '--';
+        }
+      } else if (type === 'jpyToUsd') {
+        amount = parseFloat(row.querySelector('.jpyAmount')?.value);
+        rate = parseFloat(row.querySelector('.jpyToUsdRate')?.value);
+        result = amount / rate;
+        if (!isNaN(result)) {
+          row.querySelector('.jpyToUsdResult').textContent = formatNumber(result);
+        } else {
+          row.querySelector('.jpyToUsdResult').textContent = '--';
+        }
+      }
+    }
+
+    function calculateSummary() {
+      let usdTotal = 0, jpyFromUsdTotal = 0;
+      let jpyTotal = 0, usdFromJpyTotal = 0;
+
+      document.querySelectorAll('#usdToJpyTable tr').forEach(row => {
+        const usdInput = row.querySelector('.usdAmount');
+        const rateInput = row.querySelector('.usdToJpyRate');
+        if (usdInput && rateInput) {
+          const usd = parseFloat(usdInput.value);
+          const rate = parseFloat(rateInput.value);
+          if (!isNaN(usd) && !isNaN(rate)) {
+            const jpy = usd * rate;
+            row.querySelector('.usdToJpyResult').textContent = formatNumber(jpy);
+            usdTotal += usd;
+            jpyFromUsdTotal += jpy;
+          }
+        }
+      });
+
+      document.querySelectorAll('#jpyToUsdTable tr').forEach(row => {
+        const jpyInput = row.querySelector('.jpyAmount');
+        const rateInput = row.querySelector('.jpyToUsdRate');
+        if (jpyInput && rateInput) {
+          const jpy = parseFloat(jpyInput.value);
+          const rate = parseFloat(rateInput.value);
+          if (!isNaN(jpy) && !isNaN(rate)) {
+            const usd = jpy / rate;
+            row.querySelector('.jpyToUsdResult').textContent = formatNumber(usd);
+            jpyTotal += jpy;
+            usdFromJpyTotal += usd;
+          }
+        }
+      });
+
+      const usdProfit = usdFromJpyTotal - usdTotal;
+      const usdYield = usdTotal > 0 ? (usdProfit / usdTotal) * 100 : 0;
+
+      const jpyProfit = jpyFromUsdTotal - jpyTotal;
+      const jpyYield = jpyTotal > 0 ? (jpyProfit / jpyTotal) * 100 : 0;
+
+      document.getElementById('summaryResult').innerHTML = `
+        <h3>📈 汇总结果</h3>
+        <table>
+          <tr><th>路径</th><th>兑换前金额</th><th>兑换后金额</th><th>收益金额</th><th>收益率</th></tr>
+          <tr>
+            <td>美元 → 日元 → 美元</td>
+            <td>${formatNumber(usdTotal)} 美元</td>
+            <td>${formatNumber(usdFromJpyTotal)} 美元</td>
+            <td>${formatNumber(usdProfit)} 美元</td>
+            <td>${usdYield.toFixed(2)}%</td>
+          </tr>
+          <tr>
+            <td>日元 → 美元 → 日元</td>
+            <td>${formatNumber(jpyTotal)} 日元</td>
+            <td>${formatNumber(jpyFromUsdTotal)} 日元</td>
+            <td>${formatNumber(jpyProfit)} 日元</td>
+            <td>${jpyYield.toFixed(2)}%</td>
+          </tr>
+        </table>
+      `;
+    }
+  </script>
+</body>
+</html>
